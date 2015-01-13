@@ -1,0 +1,12 @@
+build
+node_modules
+test/Image
+test/UserData
+test/*.zip
+test/userData.json
+npm-debug.log
+.jshintignore
+.jshintrc
+.gitignore
+test
+.travis.yml

@@ -1,0 +1,32 @@
+{
+  "name": "attention",
+  "version": "0.0.1",
+  "author": "Lovell Fuller <npm@lovell.info>",
+  "description": "Detect the dominant palette and salient region of an image",
+  "scripts": {
+    "test": "node ./test/unit.js",
+    "accuracy": "cd ./test && ./accuracy.sh"
+  },
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/lovell/attention"
+  },
+  "keywords": [
+    "dominant",
+    "palette",
+    "colour",
+    "color",
+    "saliency",
+    "salient",
+    "region",
+    "image"
+  ],
+  "dependencies": {
+    "nan": "^1.4.1"
+  },
+  "license": "Apache 2.0",
+  "engines": {
+    "node": ">=0.10"
+  }
+}

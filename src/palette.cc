@@ -1,7 +1,7 @@
 #include <vips/vips8>
 
-#include "exoquant.h"
 #include "nan.h"
+#include "exoquant/exoquant.h"
 #include "palette.h"
 
 struct PaletteBaton {

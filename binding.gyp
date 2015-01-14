@@ -2,7 +2,7 @@
   'targets': [{
     'target_name': 'attention',
     'sources': [
-      'src/exoquant.c',
+      'src/exoquant/exoquant.c',
       'src/attention.cc',
       'src/palette.cc',
       'src/region.cc'

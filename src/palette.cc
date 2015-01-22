@@ -38,12 +38,43 @@ class PaletteWorker : public NanAsyncWorker {
 
       // Input
       VImage image;
+      std::string loader;
       if (baton->bufferLength > 0) {
         // From buffer
+        loader = vips_foreign_find_load_buffer(baton->buffer, baton->bufferLength);
         image = VImage::new_from_buffer(baton->buffer, baton->bufferLength, NULL);
       } else {
         // From file
+        loader = vips_foreign_find_load(baton->file.c_str());
         image = VImage::new_from_file(baton->file.c_str());
+      }
+
+      // Reduce the longest edge
+      const int longestEdge = std::max(image.width(), image.height());
+      const int longestEdgeTargetLength = 120;
+
+      // Calculate float shrink ratio
+      double shrink = static_cast<double>(longestEdgeTargetLength) / static_cast<double>(longestEdge);
+
+      // Shrink-on-load JPEG
+      if (loader == "VipsForeignLoadJpegFile" && longestEdge >= 2 * longestEdgeTargetLength) {
+        int shrinkOnLoad = 2;
+        if (longestEdge >= 8 * longestEdgeTargetLength) {
+          shrinkOnLoad = 8;
+          shrink = shrink * 8.0;
+        } else if (longestEdge >= 4 * longestEdgeTargetLength) {
+          shrinkOnLoad = 4;
+          shrink = shrink * 4.0;
+        } else {
+          shrink = shrink * 2.0;
+        }
+        if (baton->bufferLength > 0) {
+          // From buffer
+          image = VImage::new_from_buffer(baton->buffer, baton->bufferLength, NULL, VImage::option()->set("shrink", shrinkOnLoad));
+        } else {
+          // From file
+          image = VImage::new_from_file(baton->file.c_str(), VImage::option()->set("shrink", shrinkOnLoad));
+        }
       }
 
       // Import embedded colour profile, if any
@@ -51,11 +82,8 @@ class PaletteWorker : public NanAsyncWorker {
         image = image.icc_import(VImage::option()->set("embedded", TRUE));
       }
 
-      // Resize shortest edge to 120px
-      double shrink = 120.0 / static_cast<double>(std::min(image.width(), image.height()));
-      if (shrink < 1.0) {
-        image = image.resize(shrink);
-      }
+      // Shrink via affine reduction
+      image = image.resize(shrink);
 
       // Ensure sRGB with alpha channel
       image = image.colourspace(VIPS_INTERPRETATION_sRGB);
@@ -78,6 +106,7 @@ class PaletteWorker : public NanAsyncWorker {
       baton->palette = new unsigned char[baton->swatches * 4]();
       exq_get_palette(exoquant, baton->palette, baton->swatches);
       exq_free(exoquant);
+      g_free(data);
 
       // Store duration
       baton->duration = ceil(g_timer_elapsed(timer, NULL) * 1000.0);

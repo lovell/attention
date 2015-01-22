@@ -41,28 +41,58 @@ class RegionWorker : public NanAsyncWorker {
 
       // Input
       VImage image;
+      std::string loader;
       if (baton->bufferLength > 0) {
         // From buffer
+        loader = vips_foreign_find_load_buffer(baton->buffer, baton->bufferLength);
         image = VImage::new_from_buffer(baton->buffer, baton->bufferLength, NULL);
       } else {
         // From file
+        loader = vips_foreign_find_load(baton->file.c_str());
         image = VImage::new_from_file(baton->file.c_str());
       }
 
       // Store original image dimensions
-      int width = image.width();
-      int height = image.height();
+      const int width = image.width();
+      const int height = image.height();
+
+      // Reduce the longest edge
+      const int longestEdge = std::max(width, height);
+      const int longestEdgeTargetLength = 320;
+
+      // Calculate float shrink ratio
+      double shrink = static_cast<double>(longestEdgeTargetLength) / static_cast<double>(longestEdge);
+
+      // Shrink-on-load JPEG
+      if (loader == "VipsForeignLoadJpegFile" && longestEdge >= 2 * longestEdgeTargetLength) {
+        int shrinkOnLoad = 2;
+        if (longestEdge >= 8 * longestEdgeTargetLength) {
+          shrinkOnLoad = 8;
+          shrink = shrink * 8.0;
+        } else if (longestEdge >= 4 * longestEdgeTargetLength) {
+          shrinkOnLoad = 4;
+          shrink = shrink * 4.0;
+        } else {
+          shrink = shrink * 2.0;
+        }
+        if (baton->bufferLength > 0) {
+          // From buffer
+          image = VImage::new_from_buffer(baton->buffer, baton->bufferLength, NULL, VImage::option()->set("shrink", shrinkOnLoad));
+        } else {
+          // From file
+          image = VImage::new_from_file(baton->file.c_str(), VImage::option()->set("shrink", shrinkOnLoad));
+        }
+      }
 
       // Import embedded colour profile, if any
       if (image.get_typeof(VIPS_META_ICC_NAME) > 0) {
         image = image.icc_import(VImage::option()->set("embedded", TRUE));
       }
 
-      // Resize longest edge to 320px
-      double shrink = 320.0 / static_cast<double>(std::max(width, height));
+      // Shrink via affine reduction
       image = image.resize(shrink);
-      int shrunkWidth = image.width();
-      int shrunkHeight = image.height();
+      const int shrunkWidth = image.width();
+      const int shrunkHeight = image.height();
 
       // Mask 1: edge detection using Sobel operators
 
@@ -104,18 +134,18 @@ class RegionWorker : public NanAsyncWorker {
 
       // Measure distance to first non-zero pixel along top and left edges
       VImage profileLeft, profileTop = mask.profile(&profileLeft);
-      int top = floor(shrink * profileTop.min());
-      int left = floor(shrink * profileLeft.min());
+      const int top = floor(shrink * profileTop.min());
+      const int left = floor(shrink * profileLeft.min());
 
       // Verify mask is non-empty
       if (top < height && left < width) {
         // Measure distance to first non-zero pixel along bottom and right edges
         VImage profileRight, profileBottom = mask.rot(VIPS_ANGLE_D180).profile(&profileRight);
-        int bottom = height - 1 - floor(shrink * profileBottom.min());
-        int right = width - 1 - floor(shrink * profileRight.min());
+        const int bottom = height - 1 - floor(shrink * profileBottom.min());
+        const int right = width - 1 - floor(shrink * profileRight.min());
 
         // Verify area of region is greater than 1/16 of original image area
-        int regionArea = (bottom - top) * (right - left);
+        const int regionArea = (bottom - top) * (right - left);
         if (regionArea > width * height / 16.0) {
           // Store results
           baton->top = top;

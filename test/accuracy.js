@@ -18,12 +18,13 @@ Object.keys(userData).forEach(function(file) {
   var filename = path.join(__dirname, 'Image', file);
   attention(filename).region(function(err, region) {
     if (err) {
-      console.log(err);
+      console.log('Skipped ' + filename + ' because ' + err);
+    } else {
+      var distTopLeft = distance(userData[file].left, userData[file].top, region.left, region.top);
+      var distBottomRight = distance(userData[file].right, userData[file].bottom, region.right, region.bottom);
+      totalDistance = totalDistance + distTopLeft + distBottomRight;
+      count++;
+      console.log('Processed ' + filename + ' in ' + region.duration + 'ms, average distance now ' + (totalDistance / count).toFixed(2));
     }
-    var distTopLeft = distance(userData[file].left, userData[file].top, region.left, region.top);
-    var distBottomRight = distance(userData[file].right, userData[file].bottom, region.right, region.bottom);
-    totalDistance = totalDistance + distTopLeft + distBottomRight;
-    count++;
-    console.log('Processed ' + filename + ' in ' + region.duration + 'ms, average distance now ' + (totalDistance / count).toFixed(2));
   });
 });

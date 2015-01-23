@@ -17,6 +17,7 @@ struct PaletteBaton {
   int duration;
 
   PaletteBaton():
+    buffer(NULL),
     bufferLength(0),
     swatches(10),
     palette(NULL),

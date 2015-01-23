@@ -6,7 +6,7 @@
 struct RegionBaton {
   // Input
   std::string file;
-  void* buffer;
+  void *buffer;
   size_t bufferLength;
 
   // Output
@@ -18,6 +18,7 @@ struct RegionBaton {
   int duration;
 
   RegionBaton():
+    buffer(NULL),
     bufferLength(0),
     top(-1),
     left(-1),
@@ -61,19 +62,20 @@ class RegionWorker : public NanAsyncWorker {
       const int longestEdgeTargetLength = 320;
 
       // Calculate float shrink ratio
-      double shrink = static_cast<double>(longestEdgeTargetLength) / static_cast<double>(longestEdge);
+      const double ratio = static_cast<double>(longestEdgeTargetLength) / static_cast<double>(longestEdge);
+      double affineRatio = ratio;
 
       // Shrink-on-load JPEG
       if (loader == "VipsForeignLoadJpegFile" && longestEdge >= 2 * longestEdgeTargetLength) {
         int shrinkOnLoad = 2;
         if (longestEdge >= 8 * longestEdgeTargetLength) {
           shrinkOnLoad = 8;
-          shrink = shrink * 8.0;
+          affineRatio = affineRatio * 8.0;
         } else if (longestEdge >= 4 * longestEdgeTargetLength) {
           shrinkOnLoad = 4;
-          shrink = shrink * 4.0;
+          affineRatio = affineRatio * 4.0;
         } else {
-          shrink = shrink * 2.0;
+          affineRatio = affineRatio * 2.0;
         }
         if (baton->bufferLength > 0) {
           // From buffer
@@ -90,7 +92,7 @@ class RegionWorker : public NanAsyncWorker {
       }
 
       // Shrink via affine reduction
-      image = image.resize(shrink);
+      image = image.resize(affineRatio);
       const int shrunkWidth = image.width();
       const int shrunkHeight = image.height();
 
@@ -113,9 +115,9 @@ class RegionWorker : public NanAsyncWorker {
       // Halve range to stay within 0-255
       sobelFiltered = (sobelFiltered / 2).cast(VIPS_FORMAT_UCHAR);
       // Calculate 85th percentile threshold
-      double sobelThreshold = static_cast<double>(sobelFiltered.percent(85));
+      const double sobelThreshold = static_cast<double>(sobelFiltered.percent(85));
       // Remove pixels below threshold and remove noise with 5x5 median filter
-      VImage edgeMask = sobelFiltered.relational_const({sobelThreshold}, VIPS_OPERATION_RELATIONAL_MOREEQ).rank(5, 5, 12);
+      VImage edgeMask = sobelFiltered.relational_const({sobelThreshold}, VIPS_OPERATION_RELATIONAL_MOREEQ);
 
       // Mask 2: prominent colours using Delta-E 2000
 
@@ -125,7 +127,7 @@ class RegionWorker : public NanAsyncWorker {
       // Calculate Delta-E 2000 distance to the average in the LAB colour space
       VImage averageDelta = image.colourspace(VIPS_INTERPRETATION_LAB).dE00(averageColour);
       // Calculate percentile threshold
-      double colourThreshold = static_cast<double>(averageDelta.percent(88));
+      const double colourThreshold = static_cast<double>(averageDelta.percent(85));
       // Remove pixels below threshold
       VImage colourMask = averageDelta.relational_const({colourThreshold}, VIPS_OPERATION_RELATIONAL_MOREEQ);
 
@@ -134,15 +136,15 @@ class RegionWorker : public NanAsyncWorker {
 
       // Measure distance to first non-zero pixel along top and left edges
       VImage profileLeft, profileTop = mask.profile(&profileLeft);
-      const int top = floor(shrink * profileTop.min());
-      const int left = floor(shrink * profileLeft.min());
+      const int top = floor(1.0 / ratio * profileTop.min());
+      const int left = floor(1.0 / ratio * profileLeft.min());
 
       // Verify mask is non-empty
       if (top < height && left < width) {
         // Measure distance to first non-zero pixel along bottom and right edges
         VImage profileRight, profileBottom = mask.rot(VIPS_ANGLE_D180).profile(&profileRight);
-        const int bottom = height - 1 - floor(shrink * profileBottom.min());
-        const int right = width - 1 - floor(shrink * profileRight.min());
+        const int bottom = height - 1 - floor(1.0 / ratio * profileBottom.min());
+        const int right = width - 1 - floor(1.0 / ratio * profileRight.min());
 
         // Verify area of region is greater than 1/16 of original image area
         const int regionArea = (bottom - top) * (right - left);

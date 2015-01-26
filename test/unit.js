@@ -58,4 +58,6 @@ attention(fixture).region(function(err, region) {
   assert.strictEqual('number', typeof region.bottom);
   assert.strictEqual('number', typeof region.right);
   assert.strictEqual('number', typeof region.duration);
+  assert.strictEqual(495, region.width);
+  assert.strictEqual(599, region.height);
 });

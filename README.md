@@ -89,12 +89,17 @@ Set `count` to the number of distinct colour swatches required, defaulting to a 
 
 Calculates the most salient region of the input image.
 
-`callback` gets the arguments `(err, region)` where `region` has the attributes representing the position of the edges of the salient region in number of pixels from the top-left corner.
+`callback` gets the arguments `(err, region)` where `region` contains the edges of the salient region in pixels from the top-left corner of the input:
 
 * `top`
 * `left`
 * `bottom`
 * `right`
+
+The `region` Object also contains:
+
+* `width`: the width of the input image.
+* `height`: the height of the input image.
 * `duration`: the length of time taken to find the salient region, in milliseconds.
 
 ## Thanks

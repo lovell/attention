@@ -11,6 +11,8 @@ struct RegionBaton {
 
   // Output
   std::string err;
+  int width;
+  int height;
   int top;
   int left;
   int bottom;
@@ -20,6 +22,8 @@ struct RegionBaton {
   RegionBaton():
     buffer(NULL),
     bufferLength(0),
+    width(-1),
+    height(-1),
     top(-1),
     left(-1),
     bottom(-1),
@@ -54,11 +58,11 @@ class RegionWorker : public NanAsyncWorker {
       }
 
       // Store original image dimensions
-      const int width = image.width();
-      const int height = image.height();
+      baton->width = image.width();
+      baton->height = image.height();
 
       // Reduce the longest edge
-      const int longestEdge = std::max(width, height);
+      const int longestEdge = std::max(baton->width, baton->height);
       const int longestEdgeTargetLength = 320;
 
       // Calculate float shrink ratio
@@ -140,15 +144,15 @@ class RegionWorker : public NanAsyncWorker {
       const int left = floor(1.0 / ratio * profileLeft.min());
 
       // Verify mask is non-empty
-      if (top < height && left < width) {
+      if (top < baton->height && left < baton->width) {
         // Measure distance to first non-zero pixel along bottom and right edges
         VImage profileRight, profileBottom = mask.rot(VIPS_ANGLE_D180).profile(&profileRight);
-        const int bottom = height - 1 - floor(1.0 / ratio * profileBottom.min());
-        const int right = width - 1 - floor(1.0 / ratio * profileRight.min());
+        const int bottom = baton->height - 1 - floor(1.0 / ratio * profileBottom.min());
+        const int right = baton->width - 1 - floor(1.0 / ratio * profileRight.min());
 
         // Verify area of region is greater than 1/16 of original image area
         const int regionArea = (bottom - top) * (right - left);
-        if (regionArea > width * height / 16.0) {
+        if (regionArea > baton->width * baton->height / 16.0) {
           // Store results
           baton->top = top;
           baton->left = left;
@@ -184,6 +188,8 @@ class RegionWorker : public NanAsyncWorker {
     } else {
       // Region Object
       v8::Local<v8::Object> region = NanNew<v8::Object>();
+      region->Set(NanNew<v8::String>("width"), NanNew<v8::Integer>(baton->width));
+      region->Set(NanNew<v8::String>("height"), NanNew<v8::Integer>(baton->height));
       region->Set(NanNew<v8::String>("top"), NanNew<v8::Integer>(baton->top));
       region->Set(NanNew<v8::String>("left"), NanNew<v8::Integer>(baton->left));
       region->Set(NanNew<v8::String>("bottom"), NanNew<v8::Integer>(baton->bottom));

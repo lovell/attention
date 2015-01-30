@@ -45,6 +45,18 @@ Attention.prototype.region = function(callback) {
 };
 
 /*
+  Find the focal point of an image
+*/
+Attention.prototype.point = function(callback) {
+  if (typeof callback === 'function') {
+    attention.point(this.options, callback);
+  } else {
+    throw new Error('Missing a callback function');
+  }
+  return this;
+};
+
+/*
   Find the most dominant colours in an image
 */
 Attention.prototype.palette = function(callback) {

@@ -61,3 +61,13 @@ attention(fixture).region(function(err, region) {
   assert.strictEqual(495, region.width);
   assert.strictEqual(599, region.height);
 });
+
+attention(fixture).point(function(err, point) {
+  if (err) throw err;
+  assert.strictEqual('object', typeof point);
+  assert.strictEqual('number', typeof point.x);
+  assert.strictEqual('number', typeof point.y);
+  assert.strictEqual('number', typeof point.duration);
+  assert.strictEqual(495, point.width);
+  assert.strictEqual(599, point.height);
+});

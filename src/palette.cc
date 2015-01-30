@@ -2,19 +2,20 @@
 
 #include "nan.h"
 #include "exoquant/exoquant.h"
+#include "resizer.h"
 #include "palette.h"
 
 struct PaletteBaton {
   // Input
-  std::string file;
   void* buffer;
   size_t bufferLength;
+  std::string file;
   int swatches;
 
   // Output
-  std::string err;
   unsigned char *palette;
   int duration;
+  std::string err;
 
   PaletteBaton():
     buffer(NULL),
@@ -26,77 +27,45 @@ struct PaletteBaton {
 
 class PaletteWorker : public NanAsyncWorker {
 
- public:
+public:
   PaletteWorker(NanCallback *callback, PaletteBaton *baton) : NanAsyncWorker(callback), baton(baton) {}
   ~PaletteWorker() {}
 
   void Execute() {
-    using vips::VImage;
-    using vips::VError;
+    GTimer *timer = g_timer_new();
+
+    // Raw image data
+    void *data = NULL;
+    size_t size = 0;
 
     try {
-      GTimer *timer = g_timer_new();
 
       // Input
-      VImage image;
-      std::string loader;
-      if (baton->bufferLength > 0) {
+      ImageResizer resizer = ImageResizer(120);
+      vips::VImage input;
+      if (baton->buffer != NULL && baton->bufferLength > 0) {
         // From buffer
-        loader = vips_foreign_find_load_buffer(baton->buffer, baton->bufferLength);
-        image = VImage::new_from_buffer(baton->buffer, baton->bufferLength, NULL);
+        input = resizer.FromBuffer(baton->buffer, baton->bufferLength);
       } else {
         // From file
-        loader = vips_foreign_find_load(baton->file.c_str());
-        image = VImage::new_from_file(baton->file.c_str());
+        input = resizer.FromFile(baton->file);
       }
-
-      // Reduce the longest edge
-      const int longestEdge = std::max(image.width(), image.height());
-      const int longestEdgeTargetLength = 120;
-
-      // Calculate float shrink ratio
-      double shrink = static_cast<double>(longestEdgeTargetLength) / static_cast<double>(longestEdge);
-
-      // Shrink-on-load JPEG
-      if (loader == "VipsForeignLoadJpegFile" && longestEdge >= 2 * longestEdgeTargetLength) {
-        int shrinkOnLoad = 2;
-        if (longestEdge >= 8 * longestEdgeTargetLength) {
-          shrinkOnLoad = 8;
-          shrink = shrink * 8.0;
-        } else if (longestEdge >= 4 * longestEdgeTargetLength) {
-          shrinkOnLoad = 4;
-          shrink = shrink * 4.0;
-        } else {
-          shrink = shrink * 2.0;
-        }
-        if (baton->bufferLength > 0) {
-          // From buffer
-          image = VImage::new_from_buffer(baton->buffer, baton->bufferLength, NULL, VImage::option()->set("shrink", shrinkOnLoad));
-        } else {
-          // From file
-          image = VImage::new_from_file(baton->file.c_str(), VImage::option()->set("shrink", shrinkOnLoad));
-        }
-      }
-
-      // Import embedded colour profile, if any
-      if (image.get_typeof(VIPS_META_ICC_NAME) > 0) {
-        image = image.icc_import(VImage::option()->set("embedded", TRUE));
-      }
-
-      // Shrink via affine reduction
-      image = image.resize(shrink);
 
       // Ensure sRGB with alpha channel
-      image = image.colourspace(VIPS_INTERPRETATION_sRGB);
-      if (image.bands() == 3) {
-        VImage alpha = VImage::black(1, 1).invert().zoom(image.width(), image.height());
-        image = image.bandjoin(alpha);
+      input = input.colourspace(VIPS_INTERPRETATION_sRGB);
+      if (input.bands() == 3) {
+        vips::VImage alpha = vips::VImage::black(1, 1).invert().zoom(input.width(), input.height());
+        input = input.bandjoin(alpha);
       }
 
       // Get raw image data
-      size_t size;
-      void *data = image.write_to_memory(&size);
+      data = input.write_to_memory(&size);
 
+    } catch (vips::VError err) {
+      baton->err = err.what();
+    }
+
+    if (data != NULL && size > 0) {
       // Quantise
       exq_data *exoquant = exq_init();
       exq_no_transparency(exoquant);
@@ -108,14 +77,11 @@ class PaletteWorker : public NanAsyncWorker {
       exq_get_palette(exoquant, baton->palette, baton->swatches);
       exq_free(exoquant);
       g_free(data);
-
-      // Store duration
-      baton->duration = ceil(g_timer_elapsed(timer, NULL) * 1000.0);
-      g_timer_destroy(timer);
-
-    } catch (VError err) {
-      baton->err = err.what();
     }
+
+    // Store duration
+    baton->duration = ceil(g_timer_elapsed(timer, NULL) * 1000.0);
+    g_timer_destroy(timer);
 
     // Clean up libvips' per-request data and threads
     vips_error_clear();
@@ -161,7 +127,7 @@ class PaletteWorker : public NanAsyncWorker {
     callback->Call(2, argv);
   }
 
- private:
+private:
   PaletteBaton *baton;
 };
 
@@ -176,7 +142,7 @@ NAN_METHOD(palette) {
     v8::Local<v8::Object> buffer = options->Get(NanNew<v8::String>("buffer"))->ToObject();
     // Take a copy to avoid problems with V8 heap compaction
     baton->bufferLength = node::Buffer::Length(buffer);
-    baton->buffer = g_malloc(baton->bufferLength);
+    baton->buffer = new char[baton->bufferLength];
     memcpy(baton->buffer, node::Buffer::Data(buffer), baton->bufferLength);
     options->Set(NanNew<v8::String>("buffer"), NanNull());
   } else {

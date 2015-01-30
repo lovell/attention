@@ -1,11 +1,11 @@
 #include <vips/vips8>
 
 #include "nan.h"
-#include "region.h"
 #include "resizer.h"
 #include "mask.h"
+#include "point.h"
 
-struct RegionBaton {
+struct PointBaton {
   // Input
   void *buffer;
   size_t bufferLength;
@@ -13,25 +13,23 @@ struct RegionBaton {
 
   // Output
   std::string err;
-  int width, height, top, left, bottom, right, duration;
+  int width, height, x, y, duration;
 
-  RegionBaton():
+  PointBaton():
     buffer(NULL),
     bufferLength(0),
     width(0),
     height(0),
-    top(0),
-    left(0),
-    bottom(0),
-    right(0),
+    x(0),
+    y(0),
     duration(0) {}
 };
 
-class RegionWorker : public NanAsyncWorker {
+class PointWorker : public NanAsyncWorker {
 
 public:
-  RegionWorker(NanCallback *callback, RegionBaton *baton) : NanAsyncWorker(callback), baton(baton) {}
-  ~RegionWorker() {}
+  PointWorker(NanCallback *callback, PointBaton *baton) : NanAsyncWorker(callback), baton(baton) {}
+  ~PointWorker() {}
 
   void Execute() {
     GTimer *timer = g_timer_new();
@@ -53,32 +51,16 @@ public:
       // Generate saliency mask
       vips::VImage mask = Mask::Saliency(input);
 
-      // Measure distance to first non-zero pixel along top and left edges
-      vips::VImage profileLeft, profileTop = mask.profile(&profileLeft);
-      const int top = floor(1.0 / resizer.ratio * profileTop.min());
-      const int left = floor(1.0 / resizer.ratio * profileLeft.min());
+      // Approximate focal point using the centre of gravity of pixels in the mask
+      vips::VImage projectRows, projectCols = mask.project(&projectRows);
+      size_t colBytes, rowBytes;
+      uint32_t *colData = reinterpret_cast<uint32_t*>(projectCols.write_to_memory(&colBytes));
+      baton->x = floor(1.0 / resizer.ratio * ElementAtMidpoint(colData, colBytes / 4));
+      g_free(colData);
+      uint32_t *rowData = reinterpret_cast<uint32_t*>(projectRows.write_to_memory(&rowBytes));
+      baton->y = floor(1.0 / resizer.ratio * ElementAtMidpoint(rowData, rowBytes / 4));
+      g_free(rowData);
 
-      // Verify mask is non-empty
-      if (top < resizer.originalHeight && left < resizer.originalWidth) {
-        // Measure distance to first non-zero pixel along bottom and right edges
-        vips::VImage profileRight, profileBottom = mask.rot(VIPS_ANGLE_D180).profile(&profileRight);
-        const int bottom = resizer.originalHeight - 1 - floor(1.0 / resizer.ratio * profileBottom.min());
-        const int right = resizer.originalWidth - 1 - floor(1.0 / resizer.ratio * profileRight.min());
-
-        // Verify area of region is greater than 1/16 of original image area
-        const int regionArea = (bottom - top) * (right - left);
-        if (regionArea > resizer.originalWidth * resizer.originalHeight / 16.0) {
-          // Store results
-          baton->top = top;
-          baton->left = left;
-          baton->bottom = bottom;
-          baton->right = right;
-        } else {
-          baton->err = "Salient region was too small";
-        }
-      } else {
-        baton->err = "Could not determine salient region";
-      }
     } catch (vips::VError err) {
       baton->err = err.what();
     }
@@ -100,12 +82,10 @@ public:
       // Error
       argv[0] = v8::Exception::Error(NanNew<v8::String>(baton->err.data(), baton->err.size()));
     } else {
-      // Region Object
+      // Point Object
       v8::Local<v8::Object> region = NanNew<v8::Object>();
-      region->Set(NanNew<v8::String>("top"), NanNew<v8::Integer>(baton->top));
-      region->Set(NanNew<v8::String>("left"), NanNew<v8::Integer>(baton->left));
-      region->Set(NanNew<v8::String>("bottom"), NanNew<v8::Integer>(baton->bottom));
-      region->Set(NanNew<v8::String>("right"), NanNew<v8::Integer>(baton->right));
+      region->Set(NanNew<v8::String>("x"), NanNew<v8::Integer>(baton->x));
+      region->Set(NanNew<v8::String>("y"), NanNew<v8::Integer>(baton->y));
       region->Set(NanNew<v8::String>("width"), NanNew<v8::Integer>(baton->width));
       region->Set(NanNew<v8::String>("height"), NanNew<v8::Integer>(baton->height));
       region->Set(NanNew<v8::String>("duration"), NanNew<v8::Integer>(baton->duration));
@@ -118,12 +98,30 @@ public:
   }
 
 private:
-  RegionBaton *baton;
+  PointBaton *baton;
+
+  /*
+    Find which element in a histogram contains the mid-point of the cumulative total
+  */
+  int ElementAtMidpoint(uint32_t* data, int size) {
+    // Convert to vector
+    std::vector<uint32_t> elements;
+    elements.insert(elements.end(), data, data + size);
+    // Calculate running total at each element
+    int partialSum[size];
+    std::partial_sum(elements.begin(), elements.end(), partialSum);
+    // Find element at mid point of running total
+    const int midPoint = floor(partialSum[size - 1] / 2.0);
+    int elementAtMidPoint = 0;
+    while (partialSum[elementAtMidPoint++] < midPoint);
+    return elementAtMidPoint;
+  }
+
 };
 
-NAN_METHOD(region) {
+NAN_METHOD(point) {
   NanScope();
-  RegionBaton *baton = new RegionBaton;
+  PointBaton *baton = new PointBaton;
 
   // Parse options
   v8::Local<v8::Object> options = args[0]->ToObject();
@@ -142,7 +140,7 @@ NAN_METHOD(region) {
 
   // Join queue for worker thread
   NanCallback *callback = new NanCallback(args[1].As<v8::Function>());
-  NanAsyncQueueWorker(new RegionWorker(callback, baton));
+  NanAsyncQueueWorker(new PointWorker(callback, baton));
 
   NanReturnUndefined();
 }

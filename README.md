@@ -27,6 +27,14 @@ The [MSRA Salient Object Database](http://research.microsoft.com/en-us/um/people
 
 A typical use case for this feature is to automatically remove less relevant parts of an image when cropping to fit fixed dimensions.
 
+### Focal Point
+
+This is the most dominant or "heaviest" point within the Salient Region.
+
+It is calculated by finding the midpoint of the total pixel count in each of the horizontal and vertical directions of the saliency mask.
+
+A typical use case for this feature is to automatically centre the most relevant part of an image when cropping/hiding the top and bottom or left and right.
+
 ## Installation
 
 	npm install attention
@@ -43,24 +51,35 @@ attention('input.jpg')
   .swatches(1)
   .palette(function(err, palette) {
     palette.swatches.forEach(function(swatch) {
-      console.dir(swatch); 
+      console.dir(swatch);
     });
   });
 ```
 outputs:
 ```
-{r: 96, g: 73, b: 58, css: '#60493a'}
+{r: 96, g: 73, b: 58, css: '#60493a', ...}
 ```
 
 ```javascript
 attention('input.jpg')
   .region(function(err, region) {
-    console.dir(region); 
+    console.dir(region);
   });
 ```
 outputs:
 ```
-{ top: 29, left: 17, bottom: 555, right: 485 }
+{ top: 29, left: 17, bottom: 555, right: 485, ... }
+```
+
+```javascript
+attention('input.jpg')
+  .point(function(err, point) {
+    console.dir(region);
+  });
+```
+outputs:
+```
+{ x: 293, y: 117, ... }
 ```
 
 ## API
@@ -101,6 +120,21 @@ The `region` Object also contains:
 * `width`: the width of the input image.
 * `height`: the height of the input image.
 * `duration`: the length of time taken to find the salient region, in milliseconds.
+
+### point(callback)
+
+Calculates the focal point of the input image.
+
+`callback` gets the arguments `(err, point)` where `point` contains the coordinates of the focal point from the top-left corner of the input:
+
+* `x`
+* `y`
+
+The `point` Object also contains:
+
+* `width`: the width of the input image.
+* `height`: the height of the input image.
+* `duration`: the length of time taken to find the focal point, in milliseconds.
 
 ## Thanks
 

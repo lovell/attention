@@ -1,3 +1,4 @@
+#include <numeric>
 #include <vips/vips8>
 
 #include "nan.h"

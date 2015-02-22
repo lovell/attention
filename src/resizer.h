@@ -11,13 +11,13 @@ public:
   /*
     Image dimensions
   */
-  int originalWidth = 0;
-  int originalHeight = 0;
+  int originalWidth;
+  int originalHeight;
 
   /*
     The ratio by which the image was shrunk to achieve longestEdge
   */
-  double ratio = 1.0;
+  double ratio;
 
   /*
     Resize the longest edge of the image to longestEdge pixels

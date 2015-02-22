@@ -7,6 +7,9 @@
 */
 ImageResizer::ImageResizer(const int longestEdge) {
   this->longestEdge = longestEdge;
+  this->originalWidth = 0;
+  this->originalHeight = 0;
+  this->ratio = 1.0;
 };
 
 /*

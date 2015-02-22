@@ -37,7 +37,7 @@ public:
     try {
 
       // Input
-      ImageResizer resizer = ImageResizer(320);
+      ImageResizer resizer = ImageResizer(240);
       vips::VImage input;
       if (baton->buffer != NULL && baton->bufferLength > 0) {
         // From buffer

@@ -46,13 +46,15 @@ vips::VImage ImageResizer::LoadAndResize(std::string file, void *buffer, size_t 
   if (buffer != NULL && bufferLength > 0) {
     // From buffer
     loader = vips_foreign_find_load_buffer(buffer, bufferLength);
-    input = vips::VImage::new_from_buffer(buffer, bufferLength, NULL);
+    input = vips::VImage::new_from_buffer(buffer, bufferLength, NULL,
+      vips::VImage::option()->set("access", VIPS_ACCESS_SEQUENTIAL));
     // Listen for "postclose" signal to delete input buffer
     g_signal_connect(input.get_image(), "postclose", G_CALLBACK(DeleteBuffer), buffer);
   } else {
     // From file
     loader = vips_foreign_find_load(file.c_str());
-    input = vips::VImage::new_from_file(file.c_str());
+    input = vips::VImage::new_from_file(file.c_str(),
+      vips::VImage::option()->set("access", VIPS_ACCESS_SEQUENTIAL));
   }
 
   // Store original image dimensions

@@ -5,13 +5,15 @@
 #include "region.h"
 #include "point.h"
 
-extern "C" void init(v8::Handle<v8::Object> target) {
-  NanScope();
+NAN_MODULE_INIT(init) {
   vips_init("attention");
 
-  NODE_SET_METHOD(target, "palette", palette);
-  NODE_SET_METHOD(target, "region", region);
-  NODE_SET_METHOD(target, "point", point);
+  Nan::Set(target, Nan::New("palette").ToLocalChecked(),
+    Nan::GetFunction(Nan::New<v8::FunctionTemplate>(palette)).ToLocalChecked());
+  Nan::Set(target, Nan::New("region").ToLocalChecked(),
+    Nan::GetFunction(Nan::New<v8::FunctionTemplate>(region)).ToLocalChecked());
+  Nan::Set(target, Nan::New("point").ToLocalChecked(),
+    Nan::GetFunction(Nan::New<v8::FunctionTemplate>(point)).ToLocalChecked());
 }
 
 NODE_MODULE(attention, init)

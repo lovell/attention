@@ -23,7 +23,7 @@ vips::VImage ImageResizer::FromFile(std::string file) {
   Load the image from a buffer
 */
 vips::VImage ImageResizer::FromBuffer(void *buffer, size_t bufferLength) {
-  return LoadAndResize(NULL, buffer, bufferLength);
+  return LoadAndResize(std::string(), buffer, bufferLength);
 };
 
 /*
@@ -47,14 +47,14 @@ vips::VImage ImageResizer::LoadAndResize(std::string file, void *buffer, size_t 
     // From buffer
     loader = vips_foreign_find_load_buffer(buffer, bufferLength);
     input = vips::VImage::new_from_buffer(buffer, bufferLength, NULL,
-      vips::VImage::option()->set("access", VIPS_ACCESS_SEQUENTIAL));
+      vips::VImage::option()->set("access", VIPS_ACCESS_RANDOM));
     // Listen for "postclose" signal to delete input buffer
     g_signal_connect(input.get_image(), "postclose", G_CALLBACK(DeleteBuffer), buffer);
   } else {
     // From file
     loader = vips_foreign_find_load(file.c_str());
     input = vips::VImage::new_from_file(file.c_str(),
-      vips::VImage::option()->set("access", VIPS_ACCESS_SEQUENTIAL));
+      vips::VImage::option()->set("access", VIPS_ACCESS_RANDOM));
   }
 
   // Store original image dimensions
@@ -84,13 +84,13 @@ vips::VImage ImageResizer::LoadAndResize(std::string file, void *buffer, size_t 
       // From buffer
       input = vips::VImage::new_from_buffer(
         buffer, bufferLength, NULL,
-        vips::VImage::option()->set("shrink", shrinkOnLoad)
+        vips::VImage::option()->set("access", VIPS_ACCESS_RANDOM)->set("shrink", shrinkOnLoad)
       );
     } else {
       // From file
       input = vips::VImage::new_from_file(
         file.c_str(),
-        vips::VImage::option()->set("shrink", shrinkOnLoad)
+        vips::VImage::option()->set("access", VIPS_ACCESS_RANDOM)->set("shrink", shrinkOnLoad)
       );
     }
   }

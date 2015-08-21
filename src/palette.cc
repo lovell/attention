@@ -25,10 +25,10 @@ struct PaletteBaton {
     duration(-1) {}
 };
 
-class PaletteWorker : public NanAsyncWorker {
+class PaletteWorker : public Nan::AsyncWorker {
 
 public:
-  PaletteWorker(NanCallback *callback, PaletteBaton *baton) : NanAsyncWorker(callback), baton(baton) {}
+  PaletteWorker(Nan::Callback *callback, PaletteBaton *baton) : Nan::AsyncWorker(callback), baton(baton) {}
   ~PaletteWorker() {}
 
   void Execute() {
@@ -89,16 +89,16 @@ public:
   }
 
   void HandleOKCallback () {
-    NanScope();
+    Nan::HandleScope();
 
-    v8::Handle<v8::Value> argv[2] = { NanNull(), NanNull() };
+    v8::Local<v8::Value> argv[2] = { Nan::Null(), Nan::Null() };
     if (!baton->err.empty()) {
       // Error
-      argv[0] = v8::Exception::Error(NanNew<v8::String>(baton->err.data(), baton->err.size()));
+      argv[0] = Nan::Error(baton->err.c_str());
     } else {
       // Palette Object
-      v8::Local<v8::Object> palette = NanNew<v8::Object>();
-      v8::Local<v8::Array> swatches = NanNew<v8::Array>(baton->swatches);
+      v8::Local<v8::Object> palette = Nan::New<v8::Object>();
+      v8::Local<v8::Array> swatches = Nan::New<v8::Array>(baton->swatches);
       for (int i = 0; i < baton->swatches; i++) {
         // Get colour components
         int red = baton->palette[i * 4];
@@ -107,15 +107,15 @@ public:
         char css[8];
         snprintf(css, sizeof(css), "#%02x%02x%02x", red, green, blue);
         // Add swatch
-        v8::Local<v8::Object> swatch = NanNew<v8::Object>();
-        swatch->Set(NanNew<v8::String>("r"), NanNew<v8::Integer>(red));
-        swatch->Set(NanNew<v8::String>("g"), NanNew<v8::Integer>(green));
-        swatch->Set(NanNew<v8::String>("b"), NanNew<v8::Integer>(blue));
-        swatch->Set(NanNew<v8::String>("css"), NanNew<v8::String>(css));
-        swatches->Set(i, swatch);
+        v8::Local<v8::Object> swatch = Nan::New<v8::Object>();
+        Nan::Set(swatch, Nan::New("r").ToLocalChecked(), Nan::New<v8::Integer>(red));
+        Nan::Set(swatch, Nan::New("g").ToLocalChecked(), Nan::New<v8::Integer>(green));
+        Nan::Set(swatch, Nan::New("b").ToLocalChecked(), Nan::New<v8::Integer>(blue));
+        Nan::Set(swatch, Nan::New("css").ToLocalChecked(), Nan::New<v8::String>(css).ToLocalChecked());
+        Nan::Set(swatches, i, swatch);
       }
-      palette->Set(NanNew<v8::String>("swatches"), swatches);
-      palette->Set(NanNew<v8::String>("duration"), NanNew<v8::Integer>(baton->duration));
+      Nan::Set(palette, Nan::New("swatches").ToLocalChecked(), swatches);
+      Nan::Set(palette, Nan::New("duration").ToLocalChecked(), Nan::New<v8::Integer>(baton->duration));
       argv[1] = palette;
     }
     if (baton->palette != NULL) {
@@ -132,29 +132,26 @@ private:
 };
 
 NAN_METHOD(palette) {
-  NanScope();
+  Nan::HandleScope();
   PaletteBaton *baton = new PaletteBaton;
 
   // Parse options
-  v8::Local<v8::Object> options = args[0]->ToObject();
-  if (options->Get(NanNew<v8::String>("buffer"))->IsObject()) {
+  v8::Local<v8::Object> options = info[0].As<v8::Object>();
+  if (Nan::Has(options, Nan::New("buffer").ToLocalChecked()).FromJust()) {
     // Input is a Buffer
-    v8::Local<v8::Object> buffer = options->Get(NanNew<v8::String>("buffer"))->ToObject();
+    v8::Local<v8::Object> buffer = Nan::Get(options, Nan::New("buffer").ToLocalChecked()).ToLocalChecked().As<v8::Object>();
     // Take a copy to avoid problems with V8 heap compaction
     baton->bufferLength = node::Buffer::Length(buffer);
     baton->buffer = new char[baton->bufferLength];
     memcpy(baton->buffer, node::Buffer::Data(buffer), baton->bufferLength);
-    options->Set(NanNew<v8::String>("buffer"), NanNull());
   } else {
     // Input is a filename
-    baton->file = *v8::String::Utf8Value(options->Get(NanNew<v8::String>("file"))->ToString());
+    baton->file = *Nan::Utf8String(Nan::Get(options, Nan::New("file").ToLocalChecked()).ToLocalChecked());
   }
   // Number of colour swatches
-  baton->swatches = options->Get(NanNew<v8::String>("swatches"))->IntegerValue();
+  baton->swatches = Nan::To<int32_t>(Nan::Get(options, Nan::New("swatches").ToLocalChecked()).ToLocalChecked()).FromJust();
 
   // Join queue for worker thread
-  NanCallback *callback = new NanCallback(args[1].As<v8::Function>());
-  NanAsyncQueueWorker(new PaletteWorker(callback, baton));
-
-  NanReturnUndefined();
+  Nan::Callback *callback = new Nan::Callback(info[1].As<v8::Function>());
+  Nan::AsyncQueueWorker(new PaletteWorker(callback, baton));
 }

@@ -26,10 +26,10 @@ struct PointBaton {
     duration(0) {}
 };
 
-class PointWorker : public NanAsyncWorker {
+class PointWorker : public Nan::AsyncWorker {
 
 public:
-  PointWorker(NanCallback *callback, PointBaton *baton) : NanAsyncWorker(callback), baton(baton) {}
+  PointWorker(Nan::Callback *callback, PointBaton *baton) : Nan::AsyncWorker(callback), baton(baton) {}
   ~PointWorker() {}
 
   void Execute() {
@@ -76,21 +76,21 @@ public:
   }
 
   void HandleOKCallback () {
-    NanScope();
+    Nan::HandleScope();
 
-    v8::Handle<v8::Value> argv[2] = { NanNull(), NanNull() };
+    v8::Local<v8::Value> argv[2] = { Nan::Null(), Nan::Null() };
     if (!baton->err.empty()) {
       // Error
-      argv[0] = v8::Exception::Error(NanNew<v8::String>(baton->err.data(), baton->err.size()));
+      argv[0] = Nan::Error(baton->err.c_str());
     } else {
       // Point Object
-      v8::Local<v8::Object> region = NanNew<v8::Object>();
-      region->Set(NanNew<v8::String>("x"), NanNew<v8::Integer>(baton->x));
-      region->Set(NanNew<v8::String>("y"), NanNew<v8::Integer>(baton->y));
-      region->Set(NanNew<v8::String>("width"), NanNew<v8::Integer>(baton->width));
-      region->Set(NanNew<v8::String>("height"), NanNew<v8::Integer>(baton->height));
-      region->Set(NanNew<v8::String>("duration"), NanNew<v8::Integer>(baton->duration));
-      argv[1] = region;
+      v8::Local<v8::Object> point = Nan::New<v8::Object>();
+      Nan::Set(point, Nan::New("x").ToLocalChecked(), Nan::New<v8::Integer>(baton->x));
+      Nan::Set(point, Nan::New("y").ToLocalChecked(), Nan::New<v8::Integer>(baton->y));
+      Nan::Set(point, Nan::New("width").ToLocalChecked(), Nan::New<v8::Integer>(baton->width));
+      Nan::Set(point, Nan::New("height").ToLocalChecked(), Nan::New<v8::Integer>(baton->height));
+      Nan::Set(point, Nan::New("duration").ToLocalChecked(), Nan::New<v8::Integer>(baton->duration));
+      argv[1] = point;
     }
     delete baton;
 
@@ -121,27 +121,24 @@ private:
 };
 
 NAN_METHOD(point) {
-  NanScope();
+  Nan::HandleScope();
   PointBaton *baton = new PointBaton;
 
   // Parse options
-  v8::Local<v8::Object> options = args[0]->ToObject();
-  if (options->Get(NanNew<v8::String>("buffer"))->IsObject()) {
+  v8::Local<v8::Object> options = info[0].As<v8::Object>();
+  if (Nan::Has(options, Nan::New("buffer").ToLocalChecked()).FromJust()) {
     // Input is a Buffer
-    v8::Local<v8::Object> buffer = options->Get(NanNew<v8::String>("buffer"))->ToObject();
+    v8::Local<v8::Object> buffer = Nan::Get(options, Nan::New("buffer").ToLocalChecked()).ToLocalChecked().As<v8::Object>();
     // Take a copy to avoid problems with V8 heap compaction
     baton->bufferLength = node::Buffer::Length(buffer);
     baton->buffer = new char[baton->bufferLength];
     memcpy(baton->buffer, node::Buffer::Data(buffer), baton->bufferLength);
-    options->Set(NanNew<v8::String>("buffer"), NanNull());
   } else {
     // Input is a filename
-    baton->file = *v8::String::Utf8Value(options->Get(NanNew<v8::String>("file"))->ToString());
+    baton->file = *Nan::Utf8String(Nan::Get(options, Nan::New("file").ToLocalChecked()).ToLocalChecked());
   }
 
   // Join queue for worker thread
-  NanCallback *callback = new NanCallback(args[1].As<v8::Function>());
-  NanAsyncQueueWorker(new PointWorker(callback, baton));
-
-  NanReturnUndefined();
+  Nan::Callback *callback = new Nan::Callback(info[1].As<v8::Function>());
+  Nan::AsyncQueueWorker(new PointWorker(callback, baton));
 }

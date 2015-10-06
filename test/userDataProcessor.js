@@ -34,9 +34,10 @@ fs.readdirSync(userDataDir).forEach(function(file) {
   var linePos = 2;
   for (var i = 0; i < entries; i++) {
     // Get data for current image
-    var filename = lines[linePos++].replace(/\\/, path.sep);
-    var regions = lines[linePos++].split('; ');
-    linePos++;
+    var filename = lines[linePos].replace(/\\/, path.sep);
+    linePos = linePos + 2;
+    var regions = lines[linePos].split('; ');
+    linePos = linePos + 2;
     // Parse human-labelled regions for min/max coords
     var lefts = [], tops = [], rights = [], bottoms = [];
     regions.forEach(function(region) {

@@ -18,7 +18,8 @@
     ],
     'include_dirs': [
       '<!(PKG_CONFIG_PATH="<(PKG_CONFIG_PATH)" pkg-config --cflags vips-cpp glib-2.0)',
-      '<!(node -e "require(\'nan\')")'
+      '<!(node -e "require(\'nan\')")',
+      '/usr/include/malloc'
     ],
     'cflags': [
       '-fexceptions',

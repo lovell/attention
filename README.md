@@ -74,7 +74,7 @@ outputs:
 ```javascript
 attention('input.jpg')
   .point(function(err, point) {
-    console.dir(region);
+    console.dir(point);
   });
 ```
 outputs:

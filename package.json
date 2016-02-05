@@ -1,6 +1,6 @@
 {
   "name": "attention",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": "Lovell Fuller <npm@lovell.info>",
   "description": "Detect the dominant palette, salient region and focal point of an image",
   "scripts": {
@@ -23,7 +23,7 @@
     "image"
   ],
   "dependencies": {
-    "nan": "^2.0.9"
+    "nan": "^2.2.0"
   },
   "license": "Apache-2.0",
   "engines": {

@@ -1,5 +1,6 @@
 build
 node_modules
+model
 test
 npm-debug.log
 .jshintignore

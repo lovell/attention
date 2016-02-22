@@ -1,8 +1,11 @@
 build
 node_modules
+model/humanae/node_modules
+model/humanae/images
 test/Image
 test/UserData
 test/*.zip
 test/userData.json
 test/*.supp
 npm-debug.log
+.DS_Store

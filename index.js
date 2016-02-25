@@ -35,8 +35,12 @@ Attention.prototype.swatches = function(swatches) {
 /*
   Find the most salient region in an image
 */
-Attention.prototype.region = function(callback) {
+Attention.prototype.region = function(cropOptions, callback) {
   if (typeof callback === 'function') {
+    this.options.cropOptions = cropOptions;
+    attention.region(this.options, callback);
+  } else if (typeof cropOptions === 'function' && typeof callback === 'undefined' ) {
+    callback = cropOptions;
     attention.region(this.options, callback);
   } else {
     throw new Error('Missing a callback function');

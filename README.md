@@ -1,6 +1,15 @@
 # attention
 
-This is an experimental Node.js module to help you discover which parts of an image draw the focus of human attention.
+This repo is no longer maintained or supported, please use [sharp](https://github.com/lovell/sharp) instead.
+
+```javascript
+sharp(input)
+  .resize(width, height)
+  .crop(sharp.strategy.attention)
+  ...
+```
+
+This was an experimental Node.js module to help you discover which parts of an image draw the focus of human attention.
 
 You could use this information to modify an image or its surroundings for maximum effect.
 

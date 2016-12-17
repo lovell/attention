@@ -4,6 +4,7 @@
   "author": "Lovell Fuller <npm@lovell.info>",
   "description": "Detect the dominant palette, salient region and focal point of an image",
   "scripts": {
+    "preinstall" : "git submodule update --init",
     "test": "node ./test/unit.js",
     "accuracy": "cd ./test && VIPS_CONCURRENCY=1 ./accuracy.sh"
   },
